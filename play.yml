@@ -1,0 +1,10 @@
+---
+- name: creating hostfile
+  hosts: all
+  tasks:
+    - name: template file added
+      template:
+        src: ~/ansible/file.j2
+        dest: /etc/hosts
+
+

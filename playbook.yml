@@ -1,0 +1,64 @@
+---
+- name: ansible demo lab
+  hosts: all
+  ignore_errors: true
+    # serial: 
+  vars_files:
+    - ~/ansible/pass.yml
+  tasks: 
+    - name: installing app
+      yum:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - httpd
+        - wget
+        - tree
+      
+        
+    - name: starting service
+      service:
+        name: httpd
+        state: started
+        enabled: true
+       
+    - name: creating a file
+      file:
+        path: /var/www/html/index.html
+        state: touch
+        
+    - name: copying content 
+      copy:
+        content: "hello world!!"
+        dest: /var/www/html/index.html
+      notify: changed  
+   
+    - name: creating user
+      user: 
+        name: san
+        groups: wheel
+        password: "{{ password | password_hash ('sha512') }}" #password is a variable inside vars_files
+        
+    - name: changing one line in a file
+      lineinfile:
+         path: /etc/selinux/config
+         regexp: '^SELINUX'
+         line: SELINUX=disabled
+        
+    - name: changing more than one file
+      blockinfile: 
+        block: |
+                hello this file is edited
+                thank you
+        path: /var/www/html/index.html
+        
+          #- import_tasks: import.yml  
+  handlers:
+        - name: changed
+          service:
+           name: httpd
+           state: restarted
+            
+- import_playbook: play.yml      
+            
+...    
