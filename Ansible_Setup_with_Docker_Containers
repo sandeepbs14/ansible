@@ -1,14 +1,29 @@
 Ansible Setup with Docker Containers
 -------------------------------------
 
-This project demonstrates how to set up an Ansible environment with Docker containers. It
-includes a script that manages the lifecycle of the Ansible and worker containers, handles
-network setup, and allows for executing Ansible commands from the Ansible container to worker
-containers.
+This project provides a streamlined process for setting up an Ansible environment within Docker containers. 
+It includes a script that automates the lifecycle management of both the Ansible controller and worker containers, 
+sets up networking, and facilitates executing Ansible commands from the Ansible container to the worker containers.
+The project comes pre-configured with hardcoded SSH keys, meaning there's no need for extensive setup which include the pre-configured SSH key. 
 
-Pull the dockers from: sandeep1415/devops
+Simply run the provided script, log into the controller container, and 
+you can start using Ansible right away—it's that simple!
 
-ansible-hosts, ansible-controller
+Ansible may prompt you with a Yes/No confirmation. 
+You can either manually confirm with "Yes" or set the required environment variable to bypass this step. 
+Alternatively, you can modify the ansible.cfg file directly to avoid the prompt.
+
+OR use commands with -e as shown below:
+
+ansible all -m ping -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+
+To get started, pull the custom Docker images from the following repository:
+
+Docker Images: sandeep1415/devops
+ansible-hosts
+ansible-controller
+
+These images are customized and ready to use, so you can quickly set up the environment without additional configuration.
 
 Features:
 
