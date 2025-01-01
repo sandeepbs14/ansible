@@ -6,6 +6,10 @@ includes a script that manages the lifecycle of the Ansible and worker container
 network setup, and allows for executing Ansible commands from the Ansible container to worker
 containers.
 
+Pull the dockers from: sandeep1415/devops
+
+ansible-hosts, ansible-controller
+
 Features:
 
 ● Start and stop Docker containers (ansible-container and worker containers).
