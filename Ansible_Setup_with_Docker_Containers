@@ -1,0 +1,154 @@
+Ansible Setup with Docker Containers
+-------------------------------------
+
+This project demonstrates how to set up an Ansible environment with Docker containers. It
+includes a script that manages the lifecycle of the Ansible and worker containers, handles
+network setup, and allows for executing Ansible commands from the Ansible container to worker
+containers.
+
+Features:
+
+● Start and stop Docker containers (ansible-container and worker containers).
+● Set up a custom Docker network (ansible_network) and assign static IPs to the
+containers.
+● Install and start SSH service on worker containers.
+● Ansible configuration to connect to worker containers with
+StrictHostKeyChecking=no.
+● Supports pinging the workers via Ansible.
+● Ability to stop and clean up all Docker containers and networks.
+Prerequisites
+● Docker installed on the host machine.
+● Basic knowledge of Docker, Ansible, and bash scripting.
+
+
+How to Use:
+
+The provided script allows you to start, stop, or ping the containers. Here are the available
+options:
+
+● Start: Creates and runs the necessary containers (Ansible container and worker
+containers).
+● Stop: Stops and removes all containers and networks created by the script.
+● Ping: Pings all the worker containers using Ansible.
+
+Running the script with no arguments will start the containers and set up the environment: ./new.sh
+
+To explicitly start the containers and setup the environment: ./new.sh start
+
+To stop all containers and remove the networks: ./new.sh stop
+
+To check the connectivity using Ansible: ./new.sh ping
+
+Docker Container Overview:
+
+● Ansible Container: This container runs Ansible and is responsible for managing worker
+containers. It has SSH access configured to reach the worker containers.
+● Worker Containers: These containers run a basic Ubuntu image with SSH enabled.
+They are configured with static IP addresses and can be pinged from the Ansible
+container for ssh key based access (hardcoded in the ubuntu image).
+
+Ansible Inventory File /etc/ansible/hosts:
+
+[workers]
+worker-container1 ansible_host=172.18.0.3 ansible_user=root
+worker-container2 ansible_host=172.18.0.5 ansible_user=root
+worker-container3 ansible_host=172.18.0.7 ansible_user=root
+worker-container4 ansible_host=172.18.0.9 ansible_user=root
+worker-container5 ansible_host=172.18.0.11 ansible_user=root
+
+Configuration:
+
+● Static IPs: The script assigns the following static IPs to the worker containers:
+○ 172.18.0.3
+○ 172.18.0.5
+○ 172.18.0.7
+○ 172.18.0.9
+○ 172.18.0.11
+● Network Name: ansible_network
+
+
+Docker Commands Used:
+
+● docker run: Used to start containers with specific images and networks.
+● docker network create: Creates a custom Docker network.
+● docker ps: Displays a list of running containers.
+● docker exec: Executes a command in a running container.
+● docker stop, docker rm: Stop and remove containers.
+● docker network rm: Removes the Docker network.
+
+Cleanup: This will clean up the environment, but the images will remain intact.
+
+When you're done, you can stop all containers and remove the networks with': ./new.sh stop
+=============================<EOT>
+
+#!/bin/bash
+# Variables
+ANSIBLE_CONTAINER_NAME="ansible-container"
+WORKER_CONTAINER_PREFIX="worker-container"
+WORKER_COUNT=5
+STATIC_IPS=("172.18.0.3" "172.18.0.5" "172.18.0.7" "172.18.0.9" "172.18.0.11")
+NETWORK_NAME="ansible_network"
+ANSIBLE_HOSTS_FILE="$(pwd)/hosts/hosts" # Path to your Ansible hosts le
+SSH_PRIVATE_KEY_PATH="$(pwd)/id_rsa" # Path to the private key for the Ansible container
+# Start Containers
+start_containers() {
+echo "Checking if network '$NETWORK_NAME' exists..."
+docker network inspect $NETWORK_NAME >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+echo "Network '$NETWORK_NAME' does not exist. Creating it..."
+docker network create --subnet=172.18.0.0/16 $NETWORK_NAME
+else
+echo "Network '$NETWORK_NAME' already exists."
+
+echo "Starting Ansible container..."
+docker run -d --name $ANSIBLE_CONTAINER_NAME --network $NETWORK_NAME ansible-controller bash -c "tail -f /dev/null"
+echo "Ansible container started."
+echo "Starting worker containers..."
+for i in $(seq 1 $WORKER_COUNT); do
+WORKER_CONTAINER_NAME="${WORKER_CONTAINER_PREFIX}${i}"
+IP_ADDRESS="${STATIC_IPS[$((i-1))]}"
+echo "Starting $WORKER_CONTAINER_NAME with IP $IP_ADDRESS..."
+docker run -d --name $WORKER_CONTAINER_NAME --network $NETWORK_NAME --ip $IP_ADDRESS \
+host bash -c "apt update && apt install -y openssh-server && service ssh start && tail -f /dev/null"
+done
+echo "Worker containers started."
+echo "Creating Ansible inventory le..."
+mkdir -p $(dirname $ANSIBLE_HOSTS_FILE)
+cat <<EOL > $ANSIBLE_HOSTS_FILE
+[workers]
+$(for i in $(seq 1 $WORKER_COUNT); do echo "worker-container$i ansible_host=${STATIC_IPS[$((i-1))]} ansible_user=root"; done)
+EOL
+echo "Ansible inventory le created at $ANSIBLE_HOSTS_FILE."
+echo "Ansible setup complete!"
+}
+# Main logic for stop command
+stop_containers() {
+echo "Stopping and removing all running containers..."
+docker stop $(docker ps -aq)
+docker rm -f $(docker ps -aq)
+echo "Pruning unused Docker networks..."
+docker network prune -f
+echo "All containers and networks stopped and removed. Images are retained."
+}
+# Main logic for ping command
+ping_ansible() {
+echo "Testing SSH connectivity from the Ansible container to worker containers..."
+docker exec -it $ANSIBLE_CONTAINER_NAME ansible all -m ping -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+}
+# Handle command-line arguments
+if [ $# -eq 0 ]; then
+echo "No arguments provided. Running the full script to start containers..."
+start_containers
+elif [ "$1" == "start" ]; then
+echo "Starting all containers and setting up the environment..."
+start_containers
+elif [ "$1" == "stop" ]; then
+echo "Stopping all containers and cleaning up the environment..."
+stop_containers
+elif [ "$1" == "ping" ]; then
+echo "Pinging all worker containers from Ansible..."
+ping_ansible
+else
+echo "Invalid argument! Use 'start', 'stop', or 'ping'."
+exit 1
+
